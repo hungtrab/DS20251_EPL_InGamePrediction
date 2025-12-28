@@ -426,11 +426,57 @@ Uses Bayesian Optimization (BayesSearchCV) for top models:
 - Model training and hyperparameter tuning
 - Model evaluation and comparison
 - Demonstration notebook
+- **NEW: Modular refactoring with Python scripts**
+- **NEW: Feature engineering with RF and SHAP**
+- **NEW: Command-line interface for all operations**
+- **NEW: Organized results directory structure**
 
 ⚠️ **Notes:**
 - modelling_cuml.ipynb shows errors (likely GPU/cuML setup issues)
 - Debug files remain from development process
 - Some season ranges commented out in scraping.py (can be enabled)
+
+---
+
+## Modular Code Structure (NEW)
+
+### Core Modules in `/code/`:
+
+1. **config.py** - Central configuration, paths, hyperparameters
+2. **data_loader.py** - Data loading and basic preparation
+3. **preprocessor.py** - Advanced preprocessing and feature engineering
+4. **metrics.py** - Custom metrics (RPS, Brier, etc.)
+5. **models.py** - Model definitions and calibration
+6. **trainer.py** - Training with Bayesian optimization
+7. **feature_engineering.py** - Feature importance (RF & SHAP modes)
+8. **data_integration.py** - Notebook converted to script
+9. **data_cleaning.py** - Notebook converted to script
+10. **train.py** - Main training script
+
+### Quick Commands:
+
+```bash
+# Data pipeline
+python code/data_integration.py
+python code/data_cleaning.py
+
+# Feature analysis
+python code/feature_engineering.py --mode rf
+python code/feature_engineering.py --mode shap
+
+# Training
+python code/train.py --evaluate-all --models random_forest xgboost --tune
+```
+
+### Results Directory:
+
+```
+results/
+├── models/           # Trained models (.pkl)
+├── figures/          # Visualizations
+├── metrics/          # Training results (JSON, CSV)
+└── feature_importance/  # RF & SHAP results
+```
 
 ---
 
