@@ -1,0 +1,92 @@
+_wandb:
+    value:
+        cli_version: 0.23.1
+        e:
+            6lky3ctoicqyx2th0urphg5w6meb1w6b:
+                args:
+                    - --evaluate-all
+                    - --models
+                    - random_forest
+                    - xgboost
+                    - --tune
+                    - --calibrate
+                    - --shap-top-k
+                    - "20"
+                    - --importance-source
+                    - auto
+                    - --wandb
+                    - --wandb-project
+                    - epl-in-game-prediction
+                    - --wandb-mode
+                    - online
+                codePath: code/train.py
+                codePathLocal: code/train.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                cudaVersion: "13.0"
+                disk:
+                    /:
+                        total: "1003622154240"
+                        used: "908607033344"
+                email: hungtranbg1704@gmail.com
+                executable: /home/hungchan/miniconda3/envs/rapids-25.10/bin/python
+                git:
+                    commit: ae9d1fe2bb5f8731c22869093dc0f3017cf39f0b
+                    remote: https://github.com/hungtrab/DS20251_EPL_InGamePrediction.git
+                gpu: NVIDIA RTX A2000 Laptop GPU
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 2560
+                      memoryTotal: "4294967296"
+                      name: NVIDIA RTX A2000 Laptop GPU
+                      uuid: GPU-595a2840-bd6f-6c35-c843-4d1510794d22
+                host: hungchan-Precision-7560
+                memory:
+                    total: "32812351488"
+                os: Linux-6.8.0-90-generic-x86_64-with-glibc2.39
+                program: /home/hungchan/Work/2025.1/DS20251_EPL_InGamePrediction/code/train.py
+                python: CPython 3.12.12
+                root: /home/hungchan/Work/2025.1/DS20251_EPL_InGamePrediction
+                startedAt: "2025-12-28T07:22:37.695061Z"
+                writerId: 6lky3ctoicqyx2th0urphg5w6meb1w6b
+        m: []
+        python_version: 3.12.12
+        t:
+            "1":
+                - 5
+                - 6
+                - 53
+            "2":
+                - 5
+                - 6
+                - 53
+            "3":
+                - 16
+            "4": 3.12.12
+            "5": 0.23.1
+            "12": 0.23.1
+            "13": linux-x86_64
+calibrate:
+    value: true
+importance_source:
+    value: auto
+label_distribution:
+    value:
+        - 97241
+        - 47901
+        - 74364
+models:
+    value:
+        - random_forest
+        - xgboost
+n_features:
+    value: 13
+n_samples:
+    value: 219506
+scaler:
+    value: standard
+shap_top_k:
+    value: 20
+tune:
+    value: true

@@ -8,6 +8,8 @@ import pandas as pd
 import argparse
 import logging
 from tqdm import tqdm
+import glob
+from config import RESULTS_DIR
 
 # Setup logging
 logging.basicConfig(
@@ -20,13 +22,15 @@ logging.basicConfig(
 class DataCleaner:
     """Clean and prepare match data for modeling"""
     
-    def __init__(self, project_dir=None, random_seed=42):
+    def __init__(self, project_dir=None, random_seed=42, importance_source='none', top_k=0):
         """
         Initialize DataCleaner
         
         Args:
             project_dir: Project directory path (auto-detected if None)
             random_seed: Random seed for reproducibility
+            importance_source: 'auto' (prefer SHAP then RF), 'shap', 'rf', or 'none'
+            top_k: Number of top features to keep (0 disables selection)
         """
         if project_dir is None:
             self.PRJ_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -44,6 +48,10 @@ class DataCleaner:
         os.makedirs(os.path.join(self.train_dir, 'match'), exist_ok=True)
         os.makedirs(os.path.join(self.test_dir, 'match'), exist_ok=True)
         
+        # Feature selection options
+        self.importance_source = importance_source
+        self.top_k = int(top_k) if top_k is not None else 0
+
         # Features to drop (low impact based on EDA)
         self.drop_features = [
             'short_pass', 'long_pass', 'cross', 
@@ -53,6 +61,59 @@ class DataCleaner:
             'tackle', 'interception', 'clearance', 
             'offside', 'yellow'
         ]
+
+    def _load_top_k_features(self):
+        """Load top-K feature names from SHAP or RF importance files."""
+        if not self.top_k or self.top_k <= 0 or self.importance_source == 'none':
+            return None
+
+        fi_dir = os.path.join(RESULTS_DIR, 'feature_importance')
+        os.makedirs(fi_dir, exist_ok=True)
+
+        def from_shap():
+            paths = sorted(glob.glob(os.path.join(fi_dir, 'shap_importance_class*.csv')))
+            if not paths:
+                return None
+            dfs = []
+            for p in paths:
+                try:
+                    df = pd.read_csv(p)[['Feature', 'SHAP_Importance']]
+                    dfs.append(df)
+                except Exception:
+                    continue
+            if not dfs:
+                return None
+            merged = pd.concat(dfs, axis=0, ignore_index=True)
+            agg = merged.groupby('Feature', as_index=False)['SHAP_Importance'].mean()
+            agg = agg.sort_values('SHAP_Importance', ascending=False)
+            return agg['Feature'].head(self.top_k).tolist()
+
+        def from_rf():
+            rf_path = os.path.join(fi_dir, 'rf_importance.csv')
+            if not os.path.exists(rf_path):
+                return None
+            try:
+                df = pd.read_csv(rf_path)[['Feature', 'Importance']]
+                df = df.sort_values('Importance', ascending=False)
+                return df['Feature'].head(self.top_k).tolist()
+            except Exception:
+                return None
+
+        top = None
+        src = self.importance_source
+        if src in ('auto', 'shap'):
+            top = from_shap()
+        if top is None and src in ('auto', 'rf'):
+            top = from_rf()
+
+        if top:
+            logging.info(
+                f"Using top-{len(top)} features from importance source='{src if src!='auto' else 'auto'}'"
+            )
+            logging.info(f"Selected features (top-{self.top_k}): {top}")
+        else:
+            logging.warning("No importance files found; proceeding without feature selection.")
+        return top
     
     def clean_match(self, match_data):
         """
@@ -162,6 +223,20 @@ class DataCleaner:
                 
                 # Clean match
                 cleaned_data = self.clean_match(match_data)
+
+                # Optional: reduce columns to top-K features based on importance
+                top_features = getattr(self, '_cached_top_features', None)
+                if top_features is None:
+                    top_features = self._load_top_k_features()
+                    self._cached_top_features = top_features
+                if top_features:
+                    cols_to_keep = [c for c in top_features if c in cleaned_data.columns]
+                    if 'result' in cleaned_data.columns:
+                        cols_to_keep = cols_to_keep + ['result']
+                    if cols_to_keep:
+                        cleaned_data = cleaned_data[cols_to_keep]
+                    else:
+                        logging.warning(f"No overlap between importance-selected features and columns in {match_file}; keeping all columns.")
                 
                 # Save individual match
                 output_match_path = os.path.join(output_dir, 'match', match_file)
@@ -240,13 +315,19 @@ def main():
                        help='Test set ratio (default: 0.2)')
     parser.add_argument('--random-seed', type=int, default=42,
                        help='Random seed for reproducibility (default: 42)')
+    parser.add_argument('--importance-source', type=str, default='none', choices=['none','auto','shap','rf'],
+                        help='Use feature importance to select top-K features for output')
+    parser.add_argument('--top-k', type=int, default=0,
+                        help='Number of top features to keep (0 = disable)')
     
     args = parser.parse_args()
     
     # Create cleaner and run
     cleaner = DataCleaner(
         project_dir=args.project_dir,
-        random_seed=args.random_seed
+        random_seed=args.random_seed,
+        importance_source=args.importance_source,
+        top_k=args.top_k
     )
     cleaner.clean_and_split(test_ratio=args.test_ratio)
 

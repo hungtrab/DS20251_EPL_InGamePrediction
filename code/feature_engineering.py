@@ -10,7 +10,7 @@ import shap
 import joblib
 import os
 import argparse
-from config import RESULTS_DIR, RANDOM_SEED, NUM_CLASSES
+from config import RESULTS_DIR, RANDOM_SEED, NUM_CLASSES, TRAIN_DATA_PATH, TEST_DATA_PATH, FULL_DATA_PATH
 from data_loader import DataLoader
 from preprocessor import DataPreprocessor
 import logging
@@ -316,7 +316,13 @@ def main():
     
     # Load data
     logging.info(f"Loading {args.data} data")
-    loader = DataLoader()
+    if args.data == 'train':
+        data_path = TRAIN_DATA_PATH
+    elif args.data == 'test':
+        data_path = TEST_DATA_PATH
+    else:
+        data_path = FULL_DATA_PATH
+    loader = DataLoader(data_path=data_path)
     X, y, feature_names = loader.prepare_features_labels()
     
     # Preprocess
