@@ -125,8 +125,10 @@ class DataCleaner:
         Returns:
             Cleaned DataFrame
         """
-        # Drop low-impact features
-        match_data = match_data.drop(columns=self.drop_features, errors='ignore')
+        # Only drop hardcoded features if NOT using importance-based selection
+        # When using top-K from SHAP/RF, let the importance selection handle feature filtering
+        if self.importance_source == 'none' or self.top_k <= 0:
+            match_data = match_data.drop(columns=self.drop_features, errors='ignore')
         
         new_match_data = pd.DataFrame()
         min_cnt = 0
