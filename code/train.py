@@ -5,18 +5,29 @@ Train models with hyperparameter tuning and calibration
 import argparse
 import logging
 import os
-from typing import List
 import numpy as np
+import joblib
+from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
 from data_loader import DataLoader
-from preprocessor import DataPreprocessor
 from trainer import ModelTrainer
 from models import get_base_classifiers
 from config import RESULTS_DIR, TRAIN_DATA_PATH, TEST_DATA_PATH, FULL_DATA_PATH
-import glob
 from metrics import compute_all_metrics
 import pandas as pd
 
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+
+
+def get_scaler(scaler_type='standard'):
+    """Get scaler by type"""
+    if scaler_type == 'standard':
+        return StandardScaler()
+    elif scaler_type == 'robust':
+        return RobustScaler()
+    elif scaler_type == 'minmax':
+        return MinMaxScaler()
+    else:
+        raise ValueError(f"Unknown scaler type: {scaler_type}")
 
 
 def main():
@@ -33,11 +44,6 @@ def main():
     parser.add_argument('--scaler', type=str, default='standard',
                        choices=['standard', 'robust', 'minmax'],
                        help='Scaler type')
-    parser.add_argument('--shap-top-k', type=int, default=20,
-                       help='Use top-K features from SHAP/RF importances (set 0 to disable)')
-    parser.add_argument('--importance-source', type=str, default='auto',
-                       choices=['auto', 'shap', 'rf'],
-                       help='Feature importance source: auto prefers SHAP, falls back to RF')
     parser.add_argument('--wandb', action='store_true', help='Enable Weights & Biases logging')
     parser.add_argument('--wandb-project', type=str, default='epl-in-game-prediction', help='W&B project name')
     parser.add_argument('--wandb-entity', type=str, default=None, help='W&B entity (username or team)')
@@ -66,72 +72,16 @@ def main():
 
     loader = DataLoader(data_path=data_path)
     X, y, feature_names = loader.prepare_features_labels()
-    original_feature_names = feature_names[:]
-
-    # Optionally reduce to top-K features based on saved importances
-    if args.shap_top_k and args.shap_top_k > 0:
-        def load_top_k_features(k: int, source: str) -> List[str]:
-            fi_dir = os.path.join(RESULTS_DIR, 'feature_importance')
-            os.makedirs(fi_dir, exist_ok=True)
-
-            def from_shap():
-                paths = sorted(glob.glob(os.path.join(fi_dir, 'shap_importance_class*.csv')))
-                if not paths:
-                    return None
-                dfs = []
-                for p in paths:
-                    try:
-                        df = pd.read_csv(p)[['Feature', 'SHAP_Importance']]
-                        dfs.append(df)
-                    except Exception:
-                        continue
-                if not dfs:
-                    return None
-                merged = pd.concat(dfs, axis=0, ignore_index=True)
-                agg = merged.groupby('Feature', as_index=False)['SHAP_Importance'].mean()
-                agg = agg.sort_values('SHAP_Importance', ascending=False)
-                return agg['Feature'].head(k).tolist()
-
-            def from_rf():
-                rf_path = os.path.join(fi_dir, 'rf_importance.csv')
-                if not os.path.exists(rf_path):
-                    return None
-                try:
-                    df = pd.read_csv(rf_path)[['Feature', 'Importance']]
-                    df = df.sort_values('Importance', ascending=False)
-                    return df['Feature'].head(k).tolist()
-                except Exception:
-                    return None
-
-            top = None
-            if source in ('auto', 'shap'):
-                top = from_shap()
-            if top is None and source in ('auto', 'rf'):
-                top = from_rf()
-            return top
-
-        top_features = load_top_k_features(args.shap_top_k, args.importance_source)
-        if top_features:
-            # Map to indices and filter X and feature_names
-            name_to_idx = {name: i for i, name in enumerate(feature_names)}
-            selected_indices = [name_to_idx[f] for f in top_features if f in name_to_idx]
-            if selected_indices:
-                import numpy as np
-                X = X[:, selected_indices]
-                feature_names = [feature_names[i] for i in selected_indices]
-                logging.info(
-                    f"Using top-{len(feature_names)} features from {args.importance_source} importance"
-                )
-                logging.info(f"Selected features (top-{args.shap_top_k}): {feature_names}")
-            else:
-                logging.warning("No overlap between SHAP/RF top features and loaded features. Using all features.")
-        else:
-            logging.warning("No SHAP/RF importance files found. Using all features.")
     
-    # Preprocess
-    preprocessor = DataPreprocessor(scaler_type=args.scaler)
-    X_scaled = preprocessor.fit_transform(X)
-    preprocessor.save()
+    # Scale features
+    scaler = get_scaler(args.scaler)
+    X_scaled = scaler.fit_transform(X)
+    
+    # Save scaler
+    scaler_path = os.path.join(RESULTS_DIR, 'models', 'scaler.pkl')
+    os.makedirs(os.path.dirname(scaler_path), exist_ok=True)
+    joblib.dump(scaler, scaler_path)
+    logging.info(f"Scaler saved to {scaler_path}")
 
     # Optional: initialize Weights & Biases
     wandb_run = None
@@ -158,15 +108,9 @@ def main():
                     'n_samples': int(X.shape[0]),
                     'n_features': int(X.shape[1]),
                     'label_distribution': np.bincount(y).tolist(),
+                    'feature_names': feature_names,
                 }
             )
-            # Log selected features if reduced
-            if len(feature_names) != len(original_feature_names):
-                try:
-                    import wandb as _wandb
-                    _wandb.config.update({'selected_features': feature_names}, allow_val_change=True)
-                except Exception:
-                    pass
         except Exception as e:
             logging.warning(f"W&B initialization failed: {e}. Continuing without W&B.")
             wandb_run = None

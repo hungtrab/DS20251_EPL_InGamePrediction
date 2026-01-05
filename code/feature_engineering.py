@@ -12,7 +12,7 @@ import os
 import argparse
 from config import RESULTS_DIR, RANDOM_SEED, NUM_CLASSES, TRAIN_DATA_PATH, TEST_DATA_PATH, FULL_DATA_PATH
 from data_loader import DataLoader
-from preprocessor import DataPreprocessor
+from sklearn.preprocessing import StandardScaler
 import logging
 
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
@@ -325,9 +325,9 @@ def main():
     loader = DataLoader(data_path=data_path)
     X, y, feature_names = loader.prepare_features_labels()
     
-    # Preprocess
-    preprocessor = DataPreprocessor(scaler_type='standard')
-    X_scaled = preprocessor.fit_transform(X)
+    # Scale features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
     
     # Initialize analyzer
     analyzer = FeatureImportanceAnalyzer(feature_names)

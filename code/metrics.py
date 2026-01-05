@@ -97,4 +97,9 @@ def compute_all_metrics(y_true, y_pred_proba, y_pred_class=None):
 
 
 # Create sklearn-compatible scorer
-rps_scorer = make_scorer(rps_score, greater_is_better=True, needs_proba=True)
+# Use response_method for sklearn >= 1.4, fallback for older versions
+try:
+    rps_scorer = make_scorer(rps_score, greater_is_better=True, response_method='predict_proba')
+except TypeError:
+    # Fallback for older sklearn versions
+    rps_scorer = make_scorer(rps_score, greater_is_better=True, needs_proba=True)

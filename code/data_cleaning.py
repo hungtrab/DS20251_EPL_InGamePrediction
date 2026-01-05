@@ -171,7 +171,11 @@ class DataCleaner:
     
     def split_data(self, test_ratio=0.2):
         """
-        Split match data into train and test sets
+        Split match data into train and test sets CHRONOLOGICALLY.
+        
+        Uses match IDs to ensure temporal ordering - earlier matches go to train,
+        later matches go to test. This prevents data leakage where future data
+        could be used to predict past outcomes.
         
         Args:
             test_ratio: Ratio of test set (default 0.2 = 20%)
@@ -187,16 +191,18 @@ class DataCleaner:
         
         logging.info(f"Found {len(match_list)} match files")
         
-        # Shuffle
-        random.shuffle(match_list)
+        # Sort by match ID (chronological order) - match IDs are sequential by time
+        # Extract numeric ID from filename (e.g., "1284741.csv" -> 1284741)
+        match_list = sorted(match_list, key=lambda x: int(x.replace('.csv', '')))
         
-        # Split
+        # Split chronologically: train = earlier matches, test = later matches
         test_size = int(len(match_list) * test_ratio)
         train_list = match_list[:-test_size]
         test_list = match_list[-test_size:]
         
-        logging.info(f"Train set: {len(train_list)} matches")
-        logging.info(f"Test set: {len(test_list)} matches")
+        logging.info(f"Train set: {len(train_list)} matches (IDs: {train_list[0]} to {train_list[-1]})")
+        logging.info(f"Test set: {len(test_list)} matches (IDs: {test_list[0]} to {test_list[-1]})")
+        logging.info("Note: Chronological split prevents data leakage (no future data in training)")
         
         return train_list, test_list
     

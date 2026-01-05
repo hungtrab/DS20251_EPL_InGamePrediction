@@ -33,11 +33,11 @@ TEST_SIZE = 0.2
 CALIB_SIZE = 0.2
 CV_SPLITS = 5
 
-# Hyperparameter search settings
+# Hyperparameter search settings (from modelling.ipynb)
 BAYESIAN_SEARCH_PARAMS = {
     'knn': {
         'n_neighbors': (3, 20),
-        'weights': ['uniform', 'distance'],
+        'weights': ['uniform'],  # notebook only uses uniform
         'metric': ['minkowski', 'euclidean', 'manhattan']
     },
     'decision_tree': {
@@ -50,19 +50,31 @@ BAYESIAN_SEARCH_PARAMS = {
         'class_weight': [None, "balanced"]
     },
     'random_forest': {
-        'n_estimators': (100, 1000, 50),
+        'n_estimators': (100, 1000),  # notebook: step of 50, but skopt handles this
         'max_depth': (10, 100),
         'min_samples_split': (2, 20),
         'min_samples_leaf': (1, 5),
-        'max_features': [None, "sqrt", "log2"],
+        'max_features': (0.1, 1.0),  # notebook uses float range
         'bootstrap': [True, False]
     },
     'xgboost': {
         'max_depth': (3, 10),
-        'n_estimators': (100, 1000, 50),
+        'n_estimators': (100, 1000),  # notebook: step of 50
         'learning_rate': (0.01, 0.3),
-        'colsample_bytree': (0.5, 1),
-        'subsample': (0.6, 1)
+        'colsample_bytree': (0.5, 1.0),
+        'subsample': (0.6, 1.0)
+    },
+    'gradient_boosting': {
+        'n_estimators': (50, 500),
+        'max_depth': (3, 15),
+        'learning_rate': (0.01, 0.3),
+        'min_samples_split': (2, 20),
+        'min_samples_leaf': (1, 10),
+        'subsample': (0.6, 1.0)
+    },
+    'adaboost': {
+        'n_estimators': (50, 500),
+        'learning_rate': (0.01, 2.0)
     }
 }
 
@@ -71,5 +83,7 @@ N_ITER_PARAMS = {
     'knn': 50,
     'decision_tree': 100,
     'random_forest': 50,
-    'xgboost': 100
+    'xgboost': 100,
+    'gradient_boosting': 50,
+    'adaboost': 50
 }
