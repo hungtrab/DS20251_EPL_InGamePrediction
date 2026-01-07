@@ -18,16 +18,16 @@ logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 def get_base_classifiers():
     """Get list of base classifiers for initial evaluation"""
     classifiers = [
-        LogisticRegression(multi_class='multinomial', solver='sag', max_iter=1000, random_state=RANDOM_SEED),
+        # LogisticRegression(multi_class='multinomial', solver='sag', max_iter=1000, random_state=RANDOM_SEED),
         KNeighborsClassifier(),
         DecisionTreeClassifier(random_state=RANDOM_SEED),
-        GaussianNB(),
+        # GaussianNB(),
         RandomForestClassifier(random_state=RANDOM_SEED),
-        AdaBoostClassifier(random_state=RANDOM_SEED),
-        GradientBoostingClassifier(random_state=RANDOM_SEED),
+        # AdaBoostClassifier(random_state=RANDOM_SEED),
+        # GradientBoostingClassifier(random_state=RANDOM_SEED),
         XGBClassifier(objective='multi:softprob', num_class=NUM_CLASSES, random_state=RANDOM_SEED),
-        LinearDiscriminantAnalysis(),
-        QuadraticDiscriminantAnalysis()
+        # LinearDiscriminantAnalysis(),
+        # QuadraticDiscriminantAnalysis()
     ]
     return classifiers
 

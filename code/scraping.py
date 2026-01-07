@@ -18,21 +18,21 @@ from datetime import datetime, timedelta
 
 # project directory (use cwd by default)
 PRJ_DIR = os.path.abspath('')
-PRJ_DIR = os.path.join(PRJ_DIR, 'code')
+# PRJ_DIR = os.path.join(PRJ_DIR, 'code')
 # basic logging
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
 # urls of EPL matches from the last 5 seasons
 IDlist = {
-    # '2018-2019' : range(1284741, 1285121),
-    # '2019-2020' : range(1375927, 1376307),
-    # '2020-2021' : range(1485184, 1485564),
-    # '2021-2022' : range(1549539, 1549919), range(1640674, 1641054) 
-    # '2022-2023' : range(1641049, 1641054),
-    # '2023-2024' : range(1729190, 1729570),
-    # '2024-2025' : range(1821049, 1821429),
-    # '2025-2026' : range(1903117, 1903207)
-    'manually': [1729448, 1729492]
+    '2018-2019' : range(1284741, 1285121),
+    '2019-2020' : range(1375927, 1376307),
+    '2020-2021' : range(1485184, 1485564),
+    '2021-2022' : range(1640674, 1641054), 
+    '2022-2023' : range(1641049, 1641054),
+    '2023-2024' : range(1729190, 1729570),
+    '2024-2025' : range(1821049, 1821429),
+    '2025-2026' : range(1903207, 1903268),
+    # 'manually': [1729448, 1729492]
 }
 
 # path for pregame data and event data

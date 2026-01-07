@@ -32,10 +32,10 @@ class DataIntegrator:
         else:
             self.PRJ_DIR = project_dir
         
-        self.pregame_data_path = os.path.join(self.PRJ_DIR, 'data', 'pregame_data', 'pregame_data.csv')
-        self.event_data_dir = os.path.join(self.PRJ_DIR, 'data', 'event_data')
-        self.match_output_dir = os.path.join(self.PRJ_DIR, 'data', 'match')
-        self.full_output_path = os.path.join(self.PRJ_DIR, 'data', 'full.csv')
+        self.pregame_data_path = os.path.join(self.PRJ_DIR, 'data_new', 'pregame_data', 'pregame_data.csv')
+        self.event_data_dir = os.path.join(self.PRJ_DIR, 'data_new', 'event_data')
+        self.match_output_dir = os.path.join(self.PRJ_DIR, 'data_new', 'match')
+        self.full_output_path = os.path.join(self.PRJ_DIR, 'data_new', 'full.csv')
         
         # Create output directories
         os.makedirs(self.match_output_dir, exist_ok=True)

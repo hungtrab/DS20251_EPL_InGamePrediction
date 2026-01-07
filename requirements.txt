@@ -43,7 +43,7 @@ ipywidgets>=8.1.0
 torchmetrics>=1.0.0
 
 # Optional: Dashboard and API
-# streamlit>=1.25.0
+streamlit>=1.25.0
 # fastapi>=0.100.0
 # uvicorn>=0.23.0
 # pydantic>=2.0.0
