@@ -125,88 +125,43 @@ python scraping.py
 
 Combine all event CSVs into a unified dataset:
 
-```python
-# In code/data_intergration.ipynb
-import pandas as pd
-import glob
-
-# Load all event CSVs
-event_files = glob.glob('../data/event_data/*.csv')
-data = []
-
-for file in event_files:
-    match_id = file.split('/')[-1].replace('.csv', '')
-    df = pd.read_csv(file)
-    df['match_id'] = match_id
-    data.append(df)
-
-# Concatenate and save
-full_data = pd.concat(data, ignore_index=True)
-full_data.to_csv('../data/full.csv', index=False)
+```bash
+python code/data_integration.py --overwrite
 ```
+
+**Options**:
+- `--project-dir`: Project directory (auto-detected if not specified)
+- `--overwrite`: Overwrite existing match files
 
 **Output**: `data/full.csv` (∼500k rows)
 
 ### Step 3: Exploratory Data Analysis
 
-Analyze patterns in the data:
+Analyze patterns in the data using the Jupyter notebook:
 
-```python
-# In code/eda.ipynb
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-df = pd.read_csv('../data/full.csv')
-
-# Event distribution by minute
-df['minute'].hist(bins=95)
-plt.xlabel('Minute')
-plt.ylabel('Number of Events')
-plt.title('Event Distribution Over Match Time')
-plt.show()
-
-# Goal distribution by team
-df[df['event_type'] == 'goal'].groupby('team').size().plot(kind='bar')
-plt.title('Goals by Team (Home vs Away)')
-plt.show()
+```bash
+jupyter notebook code/eda.ipynb
 ```
+
+**What it covers**:
+- Event distribution by minute
+- Goal distribution by team (Home vs Away)
+- Feature correlation analysis
+- Outcome class distribution
 
 ### Step 4: Feature Engineering & Data Cleaning
 
-Transform raw events into predictive features:
+Transform raw events into predictive features and split data:
 
-```python
-# In code/data_cleaning.ipynb
-import pandas as pd
-import numpy as np
-
-df = pd.read_csv('../data/full.csv')
-
-# Create cumulative features per match per minute
-features = df.groupby(['match_id', 'minute']).agg({
-    'home_goals': 'last',
-    'away_goals': 'last',
-    'home_shots': 'sum',
-    'away_shots': 'sum',
-    'home_yellow_cards': 'sum',
-    'away_yellow_cards': 'sum',
-    'home_red_cards': 'sum',
-    'away_red_cards': 'sum',
-    # ... 60+ additional features
-}).reset_index()
-
-# Chronological split (prevents data leakage)
-match_list = sorted(df['match_id'].unique())
-train_matches = match_list[:int(0.8 * len(match_list))]
-test_matches = match_list[int(0.8 * len(match_list)):]
-
-train_df = features[features['match_id'].isin(train_matches)]
-test_df = features[features['match_id'].isin(test_matches)]
-
-train_df.to_csv('../data/train/train.csv', index=False)
-test_df.to_csv('../data/test/test.csv', index=False)
+```bash
+python code/data_cleaning.py --test-ratio 0.2 --importance-source auto --top-k 20
 ```
+
+**Options**:
+- `--test-ratio`: Test set ratio (default: 0.2)
+- `--random-seed`: Random seed for reproducibility (default: 42)
+- `--importance-source`: Feature selection source - `none`, `auto`, `shap`, or `rf`
+- `--top-k`: Number of top features to keep (0 = disable)
 
 **Key Features Engineered** (60+ total):
 
@@ -240,52 +195,25 @@ test_df.to_csv('../data/test/test.csv', index=False)
 
 Train and optimize multiple classifiers:
 
-```python
-# In code/modelling.ipynb
-from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.calibration import CalibratedClassifierCV
-from skopt import BayesSearchCV
-import pandas as pd
-import joblib
+```bash
+# Train with hyperparameter tuning and calibration
+python code/train.py --models random_forest xgboost --tune --calibrate
 
-# Load data
-train = pd.read_csv('../data/train/train.csv')
-X_train = train.drop(['match_id', 'final_result'], axis=1)
-y_train = train['final_result']
+# Evaluate all base classifiers first
+python code/train.py --evaluate-all
 
-# Define search spaces
-rf_search_space = {
-    'n_estimators': (100, 500),
-    'max_depth': (10, 50),
-    'min_samples_split': (2, 20),
-    'min_samples_leaf': (1, 10)
-}
-
-# Bayesian optimization
-bayes_search = BayesSearchCV(
-    RandomForestClassifier(random_state=42),
-    rf_search_space,
-    n_iter=50,
-    cv=5,
-    scoring='neg_log_loss',
-    random_state=42
-)
-bayes_search.fit(X_train, y_train)
-
-# Calibrate probabilities
-calibrated_model = CalibratedClassifierCV(
-    bayes_search.best_estimator_,
-    method='isotonic',
-    cv=5
-)
-calibrated_model.fit(X_train, y_train)
-
-# Save model
-joblib.dump(calibrated_model, '../results/models/RandomForest_calibrated.pkl')
+# Train with Weights & Biases logging
+python code/train.py --models random_forest --tune --wandb --wandb-project epl-prediction
 ```
+
+**Options**:
+- `--models`: Models to train (space-separated): `random_forest`, `xgboost`, `decision_tree`, `knn`
+- `--tune`: Perform Bayesian hyperparameter tuning
+- `--calibrate`: Apply isotonic calibration (default: True)
+- `--evaluate-all`: Evaluate all base classifiers first
+- `--scaler`: Scaler type - `standard`, `robust`, or `minmax`
+- `--wandb`: Enable Weights & Biases logging
+- `--wandb-project`: W&B project name
 
 **Training Details**:
 - **Optimization**: Bayesian hyperparameter search (50 iterations)
@@ -304,59 +232,16 @@ joblib.dump(calibrated_model, '../results/models/RandomForest_calibrated.pkl')
 
 ### Step 6: Model Evaluation
 
-Comprehensive evaluation on test set:
+Comprehensive evaluation on test set using the Jupyter notebook:
 
-```python
-# In code/evaluation.ipynb
-import joblib
-import pandas as pd
-import numpy as np
-from sklearn.metrics import accuracy_score, log_loss
-from torchmetrics.classification import MulticlassCalibrationError
-import torch
+```bash
+jupyter notebook code/evaluation.ipynb
+```
 
-# Load test data
-test = pd.read_csv('../data/test/test.csv')
-X_test = test.drop(['match_id', 'final_result'], axis=1)
-y_test = test['final_result']
+Or run evaluation during training:
 
-# Load model
-model = joblib.load('../results/models/RandomForest_calibrated.pkl')
-
-# Predictions
-y_pred = model.predict(X_test)
-y_proba = model.predict_proba(X_test)
-
-# Calculate metrics
-def rps_score(y_true, y_proba):
-    """Ranked Probability Score for ordered outcomes"""
-    rps_sum = 0
-    for i, true_label in enumerate(y_true):
-        cumulative_pred = np.cumsum(y_proba[i])
-        cumulative_true = np.zeros(len(y_proba[i]))
-        cumulative_true[true_label:] = 1
-        rps_sum += np.sum((cumulative_pred - cumulative_true) ** 2)
-    return 1 - (rps_sum / len(y_true))
-
-accuracy = accuracy_score(y_test, y_pred)
-logloss = log_loss(y_test, y_proba)
-rps = rps_score(y_test, y_proba)
-
-# Calibration metrics
-ece_metric = MulticlassCalibrationError(num_classes=3, n_bins=15, norm='l1')
-mce_metric = MulticlassCalibrationError(num_classes=3, n_bins=15, norm='max')
-
-y_proba_tensor = torch.tensor(y_proba, dtype=torch.float32)
-y_test_tensor = torch.tensor(y_test.values, dtype=torch.long)
-
-ece = ece_metric(y_proba_tensor, y_test_tensor).item()
-mce = mce_metric(y_proba_tensor, y_test_tensor).item()
-
-print(f"Accuracy: {accuracy:.4f}")
-print(f"Log Loss: {logloss:.4f}")
-print(f"RPS Score: {rps:.4f}")
-print(f"ECE: {ece:.4f}")
-print(f"MCE: {mce:.4f}")
+```bash
+python code/train.py --evaluate-all
 ```
 
 **Evaluation Metrics**:
@@ -432,28 +317,21 @@ streamlit run app.py
 ### Preventing Data Leakage
 
 **Chronological Splitting**:
-```python
-# Sort matches by ID (chronological order)
-match_list = sorted(df['match_id'].unique(), key=lambda x: int(x))
-
-# Split by time, not randomly
-train_matches = match_list[:int(0.8 * len(match_list))]
-test_matches = match_list[int(0.8 * len(match_list)):]
+```bash
+# Data cleaning automatically uses chronological split
+python code/data_cleaning.py --test-ratio 0.2
 ```
+
+Matches are sorted by ID (chronological order) and split by time, not randomly.
 
 **Why it matters**: Random splitting would allow the model to "see the future" - training on later matches and testing on earlier ones. Chronological splitting ensures temporal validity.
 
 ### Probability Calibration
 
 **Isotonic Regression**:
-```python
-from sklearn.calibration import CalibratedClassifierCV
-
-calibrated_model = CalibratedClassifierCV(
-    base_model,
-    method='isotonic',
-    cv=5
-)
+```bash
+# Calibration is enabled by default during training
+python code/train.py --models random_forest --calibrate
 ```
 
 **Why it matters**: Raw model outputs aren't true probabilities. Calibration ensures predicted 70% actually happens 70% of the time.
@@ -461,12 +339,9 @@ calibrated_model = CalibratedClassifierCV(
 ### Feature Importance
 
 **SHAP Values**:
-```python
-import shap
-
-explainer = shap.TreeExplainer(model)
-shap_values = explainer.shap_values(X_test)
-shap.summary_plot(shap_values, X_test)
+```bash
+# Feature selection uses SHAP importance during data cleaning
+python code/data_cleaning.py --importance-source shap --top-k 20
 ```
 
 **Top Features** (by SHAP):
@@ -483,78 +358,47 @@ shap.summary_plot(shap_values, X_test)
 
 ## 🎓 Usage Examples
 
-### Example 1: Train a New Model
+### Example 1: Full Pipeline
 
-```python
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.calibration import CalibratedClassifierCV
-import pandas as pd
-import joblib
+```bash
+# Step 1: Integrate event data
+python code/data_integration.py --overwrite
 
-# Load data
-train = pd.read_csv('data/train/train.csv')
-X_train = train.drop(['match_id', 'final_result'], axis=1)
-y_train = train['final_result']
+# Step 2: Clean and split data
+python code/data_cleaning.py --test-ratio 0.2 --importance-source auto --top-k 20
 
-# Train base model
-rf = RandomForestClassifier(n_estimators=300, max_depth=30, random_state=42)
-rf.fit(X_train, y_train)
+# Step 3: Train models with tuning
+python code/train.py --models random_forest xgboost --tune --calibrate
 
-# Calibrate
-calibrated = CalibratedClassifierCV(rf, method='isotonic', cv=5)
-calibrated.fit(X_train, y_train)
-
-# Save
-joblib.dump(calibrated, 'results/models/MyModel.pkl')
+# Step 4: Launch demo app
+streamlit run code/app.py
 ```
 
-### Example 2: Make Predictions
+### Example 2: Train Specific Model
 
-```python
-import joblib
-import pandas as pd
+```bash
+# Train only Random Forest with hyperparameter tuning
+python code/train.py --models random_forest --tune --calibrate
 
-# Load model
-model = joblib.load('results/models/RandomForest_calibrated.pkl')
-
-# Load test data
-test = pd.read_csv('data/test/test.csv')
-X_test = test.drop(['match_id', 'final_result'], axis=1)
-
-# Predict probabilities
-proba = model.predict_proba(X_test)
-
-# Get prediction for a specific match at minute 60
-match_1284850_min60 = X_test[(X_test.index == 1234)]  # Example index
-prediction = model.predict_proba(match_1284850_min60)
-
-print(f"Home Win: {prediction[0][0]:.2%}")
-print(f"Draw: {prediction[0][1]:.2%}")
-print(f"Away Win: {prediction[0][2]:.2%}")
+# Train multiple models without tuning
+python code/train.py --models random_forest xgboost decision_tree knn
 ```
 
-### Example 3: Evaluate Custom Model
+### Example 3: Evaluate All Models
 
-```python
-from sklearn.metrics import accuracy_score, log_loss
-import joblib
-import pandas as pd
+```bash
+# Evaluate all base classifiers
+python code/train.py --evaluate-all
 
-# Load model and test data
-model = joblib.load('results/models/MyModel.pkl')
-test = pd.read_csv('data/test/test.csv')
-X_test = test.drop(['match_id', 'final_result'], axis=1)
-y_test = test['final_result']
+# Or use the evaluation notebook for detailed analysis
+jupyter notebook code/evaluation.ipynb
+```
 
-# Evaluate
-y_pred = model.predict(X_test)
-y_proba = model.predict_proba(X_test)
+### Example 4: Train with Experiment Tracking
 
-accuracy = accuracy_score(y_test, y_pred)
-logloss = log_loss(y_test, y_proba)
-
-print(f"Accuracy: {accuracy:.4f}")
-print(f"Log Loss: {logloss:.4f}")
+```bash
+# Train with Weights & Biases logging
+python code/train.py --models random_forest --tune --wandb --wandb-project epl-prediction --wandb-run-name rf-tuned
 ```
 
 ## 📚 Additional Documentation
