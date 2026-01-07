@@ -80,7 +80,17 @@ git lfs pull
 ```
 
 3. **Install dependencies**
+
 ```bash
+pip install -r requirements.txt
+```
+
+Installing the cuML package first is recommended but cuML is supported only on Linux-based OS, head to [rapids](https://docs.rapids.ai/install/) for installation guide. For example, if you have CUDA 13.0, Python 3.10, use this command to install:
+
+```bash
+conda create -n rapids-25.12 -c rapidsai -c conda-forge \
+    rapids=25.12 python=3.10 'cuda-version=13.0'
+conda activate rapids-25.12
 pip install -r requirements.txt
 ```
 
